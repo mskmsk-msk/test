@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사용 가능 음성 목록 확인</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; line-height: 1.6; }
+        #voiceList { margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+        .voice-item { border-bottom: 1px solid #eee; padding: 5px 0; }
+        .voice-item:last-child { border-bottom: none; }
+        strong { color: #333; }
+        button { padding: 10px 15px; font-size: 16px; margin-bottom: 20px; cursor: pointer;}
+    </style>
+</head>
+<body>
+    <h1>사용 가능한 음성 목록</h1>
+    <p>아래는 현재 이 브라우저에서 사용 가능한 음성 합성(TTS) 목소리 목록입니다. 'onvoiceschanged' 이벤트가 발생하거나 버튼을 누르면 목록이 갱신됩니다.</p>
+    <button onclick="displayVoices()">목록 새로고침</button>
+    <div id="voiceListLoading">목록을 불러오는 중... (잠시 기다리거나 '목록 새로고침' 버튼을 눌러주세요)</div>
+    <div id="voiceList"></div>
+
+    <script>
+        const voiceListDiv = document.getElementById('voiceList');
+        const voiceListLoadingDiv = document.getElementById('voiceListLoading');
+
+        function displayVoices() {
+            // 이전 목록 지우기
+            voiceListDiv.innerHTML = '';
+            voiceListLoadingDiv.textContent = '목록을 불러오는 중...';
+
+            let voices = [];
+            try {
+                voices = speechSynthesis.getVoices();
+            } catch (e) {
+                voiceListLoadingDiv.textContent = '음성 목록을 가져오는 데 실패했습니다: ' + e.message;
+                console.error("Error getting voices:", e);
+                return;
+            }
+            
+
+            if (voices.length === 0) {
+                voiceListLoadingDiv.textContent = '사용 가능한 음성 목록이 비어있습니다. 페이지가 완전히 로드된 후 다시 시도하거나, 이 기기/브라우저에서 음성 합성을 지원하지 않을 수 있습니다.';
+                // iOS에서는 초기에 비어있을 수 있으므로 onvoiceschanged를 기다립니다.
+                // 만약 이 함수가 onvoiceschanged에 의해 호출된 것이라면, 진짜 비어있는 것일 수 있습니다.
+                return;
+            }
+
+            voiceListLoadingDiv.style.display = 'none'; // 로딩 메시지 숨기기
+
+            voices.forEach(function(voice, index) {
+                const voiceItem = document.createElement('div');
+                voiceItem.classList.add('voice-item');
+                
+                let voiceInfo = `<strong>이름:</strong> ${voice.name} <br> ` +
+                                `<strong>언어:</strong> ${voice.lang} <br> ` +
+                                `<strong>기본값 여부:</strong> ${voice.default ? '예' : '아니오'}`;
+                
+                voiceItem.innerHTML = voiceInfo;
+                voiceListDiv.appendChild(voiceItem);
+            });
+
+            console.log("Voices displayed:", voices);
+        }
+
+        // onvoiceschanged 이벤트가 발생하면 음성 목록을 다시 표시
+        // 이 이벤트는 음성 목록이 변경될 때 (보통 페이지 로드 후 비동기적으로 목록이 준비될 때) 발생합니다.
+        speechSynthesis.onvoiceschanged = function() {
+            console.log("onvoiceschanged event triggered");
+            displayVoices();
+        };
+
+        // 초기 시도 (일부 브라우저에서는 즉시 목록을 반환하기도 함)
+        // iOS Safari에서는 onvoiceschanged가 더 중요할 수 있습니다.
+        // 약간의 딜레이를 주어 초기 로드를 시도해볼 수 있습니다.
+        setTimeout(function() {
+            console.log("Initial attempt to display voices after timeout.");
+            displayVoices();
+             // 만약 아직도 목록이 비어있다면, onvoiceschanged를 기다리라는 메시지를 유지하거나 업데이트 할 수 있습니다.
+            if (speechSynthesis.getVoices().length === 0 && voiceListLoadingDiv.style.display !== 'none') {
+                 voiceListLoadingDiv.textContent = "아직 음성 목록이 로드되지 않았습니다. 'onvoiceschanged' 이벤트가 발생하거나, 잠시 후 '목록 새로고침' 버튼을 눌러주세요.";
+            }
+        }, 500); // 0.5초 후 시도
+
+        // 페이지 로드 후에도 한번 더 시도 (안전장치)
+        window.onload = function() {
+            console.log("window.onload event triggered");
+             setTimeout(function() {
+                console.log("Attempting to display voices on window.onload after timeout.");
+                // onvoiceschanged가 이미 호출되어 목록이 채워졌을 수도 있으므로, 현재 상태를 보고 호출
+                if (voiceListDiv.innerHTML === '' || speechSynthesis.getVoices().length === 0) {
+                    displayVoices();
+                }
+                 if (speechSynthesis.getVoices().length === 0 && voiceListLoadingDiv.style.display !== 'none') {
+                     voiceListLoadingDiv.textContent = "페이지 로드 완료. 아직 음성 목록이 로드되지 않았습니다. 'onvoiceschanged' 이벤트가 발생하거나, 잠시 후 '목록 새로고침' 버튼을 눌러주세요.";
+                }
+            }, 1000); // 1초 후 시도
+        };
+
+    </script>
+</body>
+</html>
